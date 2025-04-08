@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Instagram Activity Tracker</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Instagram Activity Tracker</h1>
+
+        <div class="input-group">
+            <input type="text" id="usernameInput" placeholder="Enter Instagram username">
+            <button id="addBtn">Add User</button>
+        </div>
+
+        <div class="tracked-users">
+            <h3>Tracked Users:</h3>
+            <ul id="userList"></ul>
+        </div>
+
+        <div class="logs">
+            <h3>Activity Logs:</h3>
+            <button id="exportBtn">Export Logs</button>
+            <button id="clearBtn">Clear Logs</button>
+            <div id="logsContainer"></div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

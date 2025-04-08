@@ -1,0 +1,97 @@
+body {
+    width: 400px;
+    padding: 15px;
+    font-family: Arial, sans-serif;
+  }
+  
+  .container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  h1 {
+    font-size: 18px;
+    margin: 0 0 10px 0;
+    color: #262626;
+  }
+  
+  .input-group {
+    display: flex;
+    gap: 8px;
+  }
+  
+  input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #dbdbdb;
+    border-radius: 4px;
+  }
+  
+  button {
+    padding: 8px 12px;
+    background-color: #0095f6;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  button:hover {
+    background-color: #0077cc;
+  }
+  
+  .tracked-users, .logs {
+    border-top: 1px solid #dbdbdb;
+    padding-top: 10px;
+  }
+  
+  h3 {
+    font-size: 14px;
+    margin: 0 0 10px 0;
+  }
+  
+  #userList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  #userList li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px;
+    background-color: #fafafa;
+    border-radius: 4px;
+  }
+  
+  .remove-user {
+    background-color: #ed4956;
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+  
+  .remove-user:hover {
+    background-color: #c1354a;
+  }
+  
+  #logsContainer {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 10px;
+    padding: 5px;
+    background-color: #fafafa;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+  }
+  
+  .log-entry {
+    margin-bottom: 5px;
+    padding: 3px;
+    border-bottom: 1px solid #eee;
+  }
