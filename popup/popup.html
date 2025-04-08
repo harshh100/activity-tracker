@@ -2,32 +2,100 @@
 <html>
 
 <head>
-    <title>Instagram Activity Tracker</title>
-    <link rel="stylesheet" href="popup.css">
+    <title>Instagram Activity Logger</title>
+    <style>
+        body {
+            width: 350px;
+            padding: 15px;
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            font-size: 16px;
+            margin-top: 0;
+        }
+
+        input,
+        button {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button#stopBtn {
+            background-color: #f44336;
+        }
+
+        button#stopBtn:hover {
+            background-color: #d32f2f;
+        }
+
+        button#downloadLogs {
+            background-color: #2196F3;
+        }
+
+        button#downloadLogs:hover {
+            background-color: #0b7dda;
+        }
+
+        #logs {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            font-size: 12px;
+            background: #f9f9f9;
+            white-space: pre-wrap;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .active {
+            background-color: #4CAF50;
+        }
+
+        .inactive {
+            background-color: #f44336;
+        }
+    </style>
 </head>
 
 <body>
-    <div class="container">
-        <h1>Instagram Activity Tracker</h1>
-
-        <div class="input-group">
-            <input type="text" id="usernameInput" placeholder="Enter Instagram username">
-            <button id="addBtn">Add User</button>
-        </div>
-
-        <div class="tracked-users">
-            <h3>Tracked Users:</h3>
-            <ul id="userList"></ul>
-        </div>
-
-        <div class="logs">
-            <h3>Activity Logs:</h3>
-            <button id="exportBtn">Export Logs</button>
-            <button id="clearBtn">Clear Logs</button>
-            <div id="logsContainer"></div>
-        </div>
-    </div>
-
+    <h1>Instagram Activity Logger</h1>
+    <input type="text" id="username" placeholder="Enter Instagram username to monitor">
+    <button id="startBtn">Start Monitoring</button>
+    <button id="stopBtn">Stop Monitoring</button>
+    <button id="clearLogs">Clear Logs</button>
+    <button id="downloadLogs">Download Logs</button>
+    <div id="status">Status: <span id="statusText">Not monitoring</span> <span id="statusIndicator"
+            class="status-indicator inactive"></span></div>
+    <div id="logs"></div>
     <script src="popup.js"></script>
 </body>
 

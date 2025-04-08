@@ -1,91 +1,76 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const usernameInput = document.getElementById('usernameInput');
-    const addBtn = document.getElementById('addBtn');
-    const userList = document.getElementById('userList');
-    const logsContainer = document.getElementById('logsContainer');
-    const exportBtn = document.getElementById('exportBtn');
-    const clearBtn = document.getElementById('clearBtn');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const clearLogsBtn = document.getElementById('clearLogs');
+    const downloadLogsBtn = document.getElementById('downloadLogs');
+    const usernameInput = document.getElementById('username');
+    const logsDiv = document.getElementById('logs');
+    const statusText = document.getElementById('statusText');
+    const statusIndicator = document.getElementById('statusIndicator');
 
-    // Load tracked users and logs
-    chrome.storage.sync.get(['trackedUsers', 'activityLogs'], function (data) {
-        if (data.trackedUsers) {
-            data.trackedUsers.forEach(user => {
-                addUserToList(user);
-            });
+    // Load saved username and logs
+    chrome.storage.sync.get(['monitoringUsername', 'activityLogs', 'isMonitoring'], function (data) {
+        if (data.monitoringUsername) {
+            usernameInput.value = data.monitoringUsername;
         }
-
         if (data.activityLogs) {
-            data.activityLogs.forEach(log => {
-                addLogToContainer(log);
-            });
+            displayLogs(data.activityLogs);
         }
+        updateMonitoringStatus(data.isMonitoring || false);
     });
 
-    // Add user to tracking list
-    addBtn.addEventListener('click', function () {
+    startBtn.addEventListener('click', async function () {
         const username = usernameInput.value.trim();
         if (username) {
-            chrome.storage.sync.get(['trackedUsers'], function (data) {
-                const trackedUsers = data.trackedUsers || [];
-                if (!trackedUsers.includes(username)) {
-                    trackedUsers.push(username);
-                    chrome.storage.sync.set({ trackedUsers }, function () {
-                        addUserToList(username);
-                        usernameInput.value = '';
+            try {
+                // Save state first
+                await chrome.storage.sync.set({
+                    monitoringUsername: username,
+                    isMonitoring: true
+                });
 
-                        // Send message to content script to start tracking
-                        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-                            chrome.tabs.sendMessage(tabs[0].id, {
-                                action: 'startTracking',
-                                username: username
-                            });
-                        });
+                // Send message to content script
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab) {
+                    await chrome.tabs.sendMessage(tab.id, {
+                        action: 'startMonitoring',
+                        username: username
                     });
+                    updateMonitoringStatus(true);
+                } else {
+                    throw new Error('No active tab found');
                 }
-            });
+            } catch (error) {
+                console.error('Error starting monitoring:', error);
+                alert('Error starting monitoring. Make sure you\'re on Instagram.com');
+                chrome.storage.sync.set({ isMonitoring: false });
+                updateMonitoringStatus(false);
+            }
+        } else {
+            alert('Please enter a username');
         }
     });
 
-    // Remove user from tracking list
-    function addUserToList(username) {
-        const li = document.createElement('li');
-        li.innerHTML = `
-        <span>${username}</span>
-        <button class="remove-user" data-username="${username}">Remove</button>
-      `;
-        userList.appendChild(li);
+    stopBtn.addEventListener('click', async function () {
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tab) {
+                await chrome.tabs.sendMessage(tab.id, { action: 'stopMonitoring' });
+            }
+            await chrome.storage.sync.set({ isMonitoring: false });
+            updateMonitoringStatus(false);
+        } catch (error) {
+            console.error('Error stopping monitoring:', error);
+        }
+    });
 
-        li.querySelector('.remove-user').addEventListener('click', function () {
-            const username = this.getAttribute('data-username');
-            chrome.storage.sync.get(['trackedUsers'], function (data) {
-                const trackedUsers = data.trackedUsers || [];
-                const updatedUsers = trackedUsers.filter(u => u !== username);
-                chrome.storage.sync.set({ trackedUsers: updatedUsers }, function () {
-                    li.remove();
 
-                    // Send message to content script to stop tracking
-                    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-                        chrome.tabs.sendMessage(tabs[0].id, {
-                            action: 'stopTracking',
-                            username: username
-                        });
-                    });
-                });
-            });
-        });
-    }
+    clearLogsBtn.addEventListener('click', function () {
+        chrome.storage.sync.set({ activityLogs: [] });
+        logsDiv.innerHTML = '';
+    });
 
-    // Add log entry to UI
-    function addLogToContainer(log) {
-        const logEntry = document.createElement('div');
-        logEntry.className = 'log-entry';
-        logEntry.textContent = log;
-        logsContainer.appendChild(logEntry);
-        logsContainer.scrollTop = logsContainer.scrollHeight;
-    }
-
-    // Export logs
-    exportBtn.addEventListener('click', function () {
+    downloadLogsBtn.addEventListener('click', function () {
         chrome.storage.sync.get(['activityLogs'], function (data) {
             if (data.activityLogs && data.activityLogs.length > 0) {
                 const logsText = data.activityLogs.join('\n');
@@ -94,25 +79,47 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `instagram_activity_logs_${new Date().toISOString().slice(0, 10)}.txt`;
+                a.download = `instagram_activity_log_${new Date().toISOString().slice(0, 10)}.txt`;
+                document.body.appendChild(a);
                 a.click();
-
+                document.body.removeChild(a);
                 URL.revokeObjectURL(url);
+            } else {
+                alert('No logs to download');
             }
         });
     });
 
-    // Clear logs
-    clearBtn.addEventListener('click', function () {
-        chrome.storage.sync.set({ activityLogs: [] }, function () {
-            logsContainer.innerHTML = '';
-        });
+    // Listen for log updates
+    chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+        if (request.action === 'updateLogs') {
+            displayLogs(request.logs);
+            sendResponse({ success: true });
+        } else if (request.action === 'updateStatus') {
+            updateMonitoringStatus(request.isMonitoring);
+            sendResponse({ success: true });
+        }
+        return true; // Keep the message channel open for sendResponse
     });
 
-    // Listen for new logs from background script
-    chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-        if (request.action === 'newLog') {
-            addLogToContainer(request.log);
+    function displayLogs(logs) {
+        logsDiv.innerHTML = '';
+        logs.forEach(log => {
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.textContent = log;
+            logsDiv.appendChild(logEntry);
+        });
+        logsDiv.scrollTop = logsDiv.scrollHeight;
+    }
+
+    function updateMonitoringStatus(isMonitoring) {
+        if (isMonitoring) {
+            statusText.textContent = 'Monitoring ' + usernameInput.value;
+            statusIndicator.className = 'status-indicator active';
+        } else {
+            statusText.textContent = 'Not monitoring';
+            statusIndicator.className = 'status-indicator inactive';
         }
-    });
+    }
 });

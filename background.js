@@ -1,4 +1,4 @@
-// Background script (minimal for Manifest v3)
+// We don't need much background functionality for this extension
 chrome.runtime.onInstalled.addListener(() => {
-    console.log('Instagram Activity Tracker installed');
+    console.log('Instagram Activity Logger installed');
 });
