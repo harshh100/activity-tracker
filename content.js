@@ -101,12 +101,42 @@ function checkActiveStatus() {
     const chatItems = document.querySelectorAll('[role="list"] [role="button"]');
     let foundUser = null;
 
+    // Helper function to extract text from username element, including emoji alts
+    function getUsernameText(usernameElement) {
+        if (!usernameElement) return '';
+
+        // If it's a simple text node
+        if (usernameElement.textContent && !usernameElement.querySelector('img')) {
+            return usernameElement.textContent.toLowerCase();
+        }
+
+        // If it contains emoji images
+        let username = '';
+        const nodes = usernameElement.childNodes;
+
+        for (const node of nodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                username += node.textContent;
+            } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'IMG') {
+                username += node.getAttribute('alt') || '';
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                // Handle nested spans that might contain more emojis
+                username += getUsernameText(node);
+            }
+        }
+
+        return username.toLowerCase().trim();
+    }
+
     // Find target user
     for (const item of chatItems) {
         const usernameElement = item.querySelector('span[dir="auto"] span');
-        if (usernameElement?.textContent?.toLowerCase() === monitoringState.targetUsername) {
-            foundUser = item;
-            break;
+        if (usernameElement) {
+            const currentUsername = getUsernameText(usernameElement);
+            if (currentUsername === monitoringState.targetUsername) {
+                foundUser = item;
+                break;
+            }
         }
     }
 
@@ -115,6 +145,7 @@ function checkActiveStatus() {
         return;
     }
 
+    // Rest of the function remains the same...
     // Method 1: Check for "Active now" or "Active Xm ago" text
     const activeStatusElement = Array.from(foundUser.querySelectorAll('span[dir="auto"]'))
         .find(el => el.textContent.includes('Active'));
@@ -126,9 +157,6 @@ function checkActiveStatus() {
     const greenDot = profilePhotoContainer?.querySelector('.x1wyv8x2, [class*="active"], .x13fuv20');
     const dotActive = !!greenDot;
 
-    // User is active if either indicator is present
-    // console.log("textActive : ", textActive);
-    // console.log("dotActive : ", dotActive);
     const isActive = textActive || dotActive;
 
     // Rest of the status change handling remains the same...
@@ -138,10 +166,10 @@ function checkActiveStatus() {
         if (isActive) {
             monitoringState.statusStartTime = now;
             const activeType = textActive ? "TEXT" : "GREEN_DOT";
-            logActivity(`STATUS CHANGE: Became active (${activeType}) at ${formatTime(now)}`);
+            logActivity(`STATUS -- change --: Active (${activeType}) at ${formatTime(now)}`);
         } else if (monitoringState.statusStartTime) {
             const duration = (now - monitoringState.statusStartTime) / 1000;
-            logActivity(`STATUS CHANGE: Went inactive after ${formatDuration(duration)}`);
+            logActivity(`STATUS -- change -- : Went inactive after ${formatDuration(duration)} at ${formatTime(now)}`);
         }
 
         monitoringState.currentStatus = isActive;
@@ -155,10 +183,9 @@ function checkActiveStatus() {
         logCurrentStatus();
     }
 }
-
 function logCurrentStatus() {
     const now = new Date();
-    const status = monitoringState.currentStatus ? 'ACTIVE' : 'INACTIVE';
+    const status = monitoringState.currentStatus ? '🟢ACTIVE' : '🔴INACTIVE';
     let duration = '';
 
     if (monitoringState.currentStatus && monitoringState.statusStartTime) {
@@ -170,7 +197,7 @@ function logCurrentStatus() {
 
 function logActivity(message) {
     const timestamp = new Date().toISOString();
-    const fullMessage = `[${timestamp}] ${monitoringState.targetUsername}: ${message}`;
+    const fullMessage = `${monitoringState.targetUsername}: ${message}`;
 
     chrome.storage.sync.get(['activityLogs'], (data) => {
         const logs = data.activityLogs || [];
