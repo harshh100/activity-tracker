@@ -1,12 +1,18 @@
-// Instagram Activity Logger - Fully Working Version
+// Instagram Activity Logger - Optimized with Custom Log Format
 let monitoringState = {
     isMonitoring: false,
     targetUsername: '',
     currentStatus: null,
-    statusStartTime: null,
-    checkInterval: null,
-    lastLoggedMinute: null
+    checkInterval: null
 };
+
+let statusPeriod = {
+    current: null,      // 'active' or 'inactive'
+    startTime: null,    // When current status started
+    endTime: null       // When current status ended
+};
+
+let previousPeriod = null;
 
 // Initialize connection
 if (window.location.hostname.includes('instagram.com')) {
@@ -24,7 +30,7 @@ function setupMessageListener() {
                 } else {
                     sendResponse({ success: false, message: 'Already monitoring' });
                 }
-                return true; // Keep channel open for async response
+                return true;
 
             case 'stopMonitoring':
                 stopMonitoring();
@@ -34,7 +40,7 @@ function setupMessageListener() {
             case 'getStatus':
                 sendResponse({
                     ...monitoringState,
-                    statusStartTime: monitoringState.statusStartTime?.toISOString()
+                    statusStartTime: statusPeriod.startTime?.toISOString()
                 });
                 return true;
 
@@ -58,16 +64,23 @@ function startMonitoring(username) {
         isMonitoring: true,
         targetUsername: username.toLowerCase(),
         currentStatus: null,
-        statusStartTime: null,
-        checkInterval: null,
-        lastLoggedMinute: null
+        checkInterval: null
     };
 
     // Store monitoring state
     chrome.storage.sync.set({
         isMonitoring: true,
-        monitoringUsername: username
+        monitoringUsername: username,
+        activityLogs: [] // Clear previous logs
     });
+
+    // Initialize status period tracking
+    statusPeriod = {
+        current: null,
+        startTime: null,
+        endTime: null
+    };
+    previousPeriod = null;
 
     // Start checking immediately and every 5 seconds
     monitoringState.checkInterval = setInterval(() => {
@@ -88,6 +101,11 @@ function startMonitoring(username) {
 function stopMonitoring() {
     if (!monitoringState.isMonitoring) return;
 
+    // Log final status before stopping
+    if (statusPeriod.current !== null) {
+        logStatusPeriod(true);
+    }
+
     clearInterval(monitoringState.checkInterval);
     monitoringState.isMonitoring = false;
     chrome.storage.sync.set({ isMonitoring: false });
@@ -100,33 +118,6 @@ function checkActiveStatus() {
 
     const chatItems = document.querySelectorAll('[role="list"] [role="button"]');
     let foundUser = null;
-
-    // Helper function to extract text from username element, including emoji alts
-    function getUsernameText(usernameElement) {
-        if (!usernameElement) return '';
-
-        // If it's a simple text node
-        if (usernameElement.textContent && !usernameElement.querySelector('img')) {
-            return usernameElement.textContent.toLowerCase();
-        }
-
-        // If it contains emoji images
-        let username = '';
-        const nodes = usernameElement.childNodes;
-
-        for (const node of nodes) {
-            if (node.nodeType === Node.TEXT_NODE) {
-                username += node.textContent;
-            } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'IMG') {
-                username += node.getAttribute('alt') || '';
-            } else if (node.nodeType === Node.ELEMENT_NODE) {
-                // Handle nested spans that might contain more emojis
-                username += getUsernameText(node);
-            }
-        }
-
-        return username.toLowerCase().trim();
-    }
 
     // Find target user
     for (const item of chatItems) {
@@ -145,63 +136,58 @@ function checkActiveStatus() {
         return;
     }
 
-    // Rest of the function remains the same...
-    // Method 1: Check for "Active now" or "Active Xm ago" text
+    // Check active status
     const activeStatusElement = Array.from(foundUser.querySelectorAll('span[dir="auto"]'))
         .find(el => el.textContent.includes('Active'));
     const activeText = activeStatusElement?.textContent?.toLowerCase() || '';
     const textActive = activeText.includes('active now');
 
-    // Method 2: Check for green dot indicator
     const profilePhotoContainer = foundUser.querySelector('[style*="height: 56px"][style*="width: 56px"]');
     const greenDot = profilePhotoContainer?.querySelector('.x1wyv8x2, [class*="active"], .x13fuv20');
     const dotActive = !!greenDot;
 
     const isActive = textActive || dotActive;
 
-    // Rest of the status change handling remains the same...
+    // Handle status changes
     if (monitoringState.currentStatus !== isActive) {
-        const now = new Date();
+        monitoringState.currentStatus = isActive;
 
-        if (isActive) {
-            monitoringState.statusStartTime = now;
-            const activeType = textActive ? "TEXT" : "GREEN_DOT";
-            logActivity(`STATUS -- change --: Active (${activeType}) at ${formatTime(now)}`);
-        } else if (monitoringState.statusStartTime) {
-            const duration = (now - monitoringState.statusStartTime) / 1000;
-            logActivity(`STATUS -- change -- : Went inactive after ${formatDuration(duration)} at ${formatTime(now)}`);
+        // If we had a previous status period, log it
+        if (statusPeriod.current !== null) {
+            statusPeriod.endTime = new Date();
+            logStatusPeriod();
+            previousPeriod = { ...statusPeriod };
         }
 
-        monitoringState.currentStatus = isActive;
-        updatePopupStatus();
-    }
-
-    // Minute logging remains the same...
-    const currentMinute = new Date().getMinutes();
-    if (monitoringState.lastLoggedMinute === null || currentMinute !== monitoringState.lastLoggedMinute) {
-        monitoringState.lastLoggedMinute = currentMinute;
-        logCurrentStatus();
+        // Start new status period
+        statusPeriod.current = isActive ? 'active' : 'inactive';
+        statusPeriod.startTime = new Date();
+        statusPeriod.endTime = null;
     }
 }
-function logCurrentStatus() {
+
+function logStatusPeriod(stopMonitoring = false) {
     const now = new Date();
-    const status = monitoringState.currentStatus ? '🟢ACTIVE' : '🔴INACTIVE';
-    let duration = '';
+    const endTime = stopMonitoring ? now : (statusPeriod.endTime || now);
+    const duration = (endTime - statusPeriod.startTime) / 1000;
+    const status = statusPeriod.current === 'active' ? '🟢ACTIVE' : '🔴INACTIVE';
+    const durationText = statusPeriod.current === 'active' ? 'active' : 'inactive';
 
-    if (monitoringState.currentStatus && monitoringState.statusStartTime) {
-        duration = ` for ${formatDuration((now - monitoringState.statusStartTime) / 1000)}`;
+    let message = `${monitoringState.targetUsername}: ${status}\t||\t[ ${formatDuration(duration)} ]\t|| START : ${formatTime(statusPeriod.startTime)} || `;
+
+    if (stopMonitoring) {
+        message += `Monitoring stopped : ${formatTime(endTime)}`;
+    } else {
+        message += `END : ${formatTime(endTime)}`;
     }
 
-    logActivity(`STATUS UPDATE: ${status}${duration} at ${formatTime(now)}`);
+    addToLogs(message);
 }
 
-function logActivity(message) {
-    const timestamp = new Date().toISOString();
-    const fullMessage = `${monitoringState.targetUsername}: ${message}`;
-
+function addToLogs(message) {
     chrome.storage.sync.get(['activityLogs'], (data) => {
         const logs = data.activityLogs || [];
-        logs.push(fullMessage);
+        logs.push(message);
         chrome.storage.sync.set({ activityLogs: logs });
 
         chrome.runtime.sendMessage({
@@ -210,10 +196,48 @@ function logActivity(message) {
         }).catch(() => { });
     });
 
-    console.log(fullMessage);
+    console.log(message);
 }
 
-// Helper functions
+function updatePopupStatus() {
+    chrome.runtime.sendMessage({
+        action: 'updateStatus',
+        status: {
+            isMonitoring: monitoringState.isMonitoring,
+            targetUsername: monitoringState.targetUsername,
+            currentStatus: monitoringState.currentStatus,
+            statusStartTime: statusPeriod.startTime?.toISOString(),
+            lastUpdate: new Date().toISOString()
+        }
+    }).catch(() => { });
+}
+
+function getUsernameText(usernameElement) {
+    if (!usernameElement) return '';
+
+    // If it's a simple text node
+    if (usernameElement.textContent && !usernameElement.querySelector('img')) {
+        return usernameElement.textContent.toLowerCase();
+    }
+
+    // If it contains emoji images
+    let username = '';
+    const nodes = usernameElement.childNodes;
+
+    for (const node of nodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            username += node.textContent;
+        } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'IMG') {
+            username += node.getAttribute('alt') || '';
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            // Handle nested spans that might contain more emojis
+            username += getUsernameText(node);
+        }
+    }
+
+    return username.toLowerCase().trim();
+}
+
 function formatTime(date) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
@@ -224,21 +248,8 @@ function formatDuration(seconds) {
     const secs = Math.floor(seconds % 60);
 
     return [
-        hours > 0 ? `${hours}h` : '',
-        minutes > 0 ? `${minutes}m` : '',
+        hours > 0 ? `${hours}h ` : '',
+        minutes > 0 ? `${minutes}m ` : '',
         `${secs}s`
-    ].filter(Boolean).join(' ');
-}
-
-function updatePopupStatus() {
-    chrome.runtime.sendMessage({
-        action: 'updateStatus',
-        status: {
-            isMonitoring: monitoringState.isMonitoring,
-            targetUsername: monitoringState.targetUsername,
-            currentStatus: monitoringState.currentStatus,
-            statusStartTime: monitoringState.statusStartTime?.toISOString(),
-            lastUpdate: new Date().toISOString()
-        }
-    }).catch(() => { });
+    ].join('').trim();
 }
