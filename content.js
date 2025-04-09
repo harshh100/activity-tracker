@@ -94,6 +94,7 @@ function startMonitoring(username) {
     // Initial check
     checkActiveStatus();
 
+    addToLogs(`Started monitoring\n`);
     console.log(`Started monitoring ${monitoringState.targetUsername}`);
     updatePopupStatus();
 }
