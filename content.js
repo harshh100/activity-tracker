@@ -98,7 +98,33 @@ function startMonitoring(username) {
 
     console.log(`Started monitoring ${monitoringState.targetUsername}`);
     const now = new Date();
-    addToLogs(`Started monitoring : ${now}\n`);
+    const formattedDate = now.toString().replace(/GMT[+-]\d{4} /, '');
+
+    let lastActiveText = '';
+    if (activeAGO && activeAGO.includes('ago')) {
+        const agoMatch = activeAGO.match(/(\d+)\s*(m|s|h|d)\s*ago/i);
+        if (agoMatch) {
+            const value = parseInt(agoMatch[1]);
+            const unit = agoMatch[2].toLowerCase();
+            let millisecondsAgo = 0;
+
+            switch (unit) {
+                case 's': millisecondsAgo = value * 1000; break;
+                case 'm': millisecondsAgo = value * 60 * 1000; break;
+                case 'h': millisecondsAgo = value * 60 * 60 * 1000; break;
+                case 'd': millisecondsAgo = value * 24 * 60 * 60 * 1000; break;
+            }
+
+            const lastActiveTime = new Date(now - millisecondsAgo);
+            // Format time in 12-hour format without seconds
+            const hours = lastActiveTime.getHours();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const hours12 = hours % 12 || 12;
+            const minutes = lastActiveTime.getMinutes().toString().padStart(2, '0');
+            lastActiveText = ` ||\tlast active : ${hours12}:${minutes} ${ampm}`;
+        }
+    }
+    addToLogs(`Started monitoring : ${formattedDate} ${lastActiveText} \n`);
     updatePopupStatus();
 }
 
@@ -178,12 +204,38 @@ function logStatusPeriod(stopMonitoring = false) {
     const status = statusPeriod.current === 'active' ? '🟢ACTIVE' : '🔴INACTIVE';
     const durationText = statusPeriod.current === 'active' ? 'active' : 'inactive';
 
+    // Calculate last active time if available
+    let lastActiveText = '';
+    if (activeAGO && activeAGO.includes('ago')) {
+        const agoMatch = activeAGO.match(/(\d+)\s*(m|s|h|d)\s*ago/i);
+        if (agoMatch) {
+            const value = parseInt(agoMatch[1]);
+            const unit = agoMatch[2].toLowerCase();
+            let millisecondsAgo = 0;
+
+            switch (unit) {
+                case 's': millisecondsAgo = value * 1000; break;
+                case 'm': millisecondsAgo = value * 60 * 1000; break;
+                case 'h': millisecondsAgo = value * 60 * 60 * 1000; break;
+                case 'd': millisecondsAgo = value * 24 * 60 * 60 * 1000; break;
+            }
+
+            const lastActiveTime = new Date(now - millisecondsAgo);
+            // Format time in 12-hour format without seconds
+            const hours = lastActiveTime.getHours();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const hours12 = hours % 12 || 12;
+            const minutes = lastActiveTime.getMinutes().toString().padStart(2, '0');
+            lastActiveText = ` ||\tlast active : ${hours12}:${minutes} ${ampm}`;
+        }
+    }
+
     let message = `${monitoringState.targetUsername}: ${status}\t||\t[ ${formatDuration(duration)} ]\t|| START : ${formatTime(statusPeriod.startTime)} || `;
 
     if (stopMonitoring) {
-        message += `Monitoring stopped : ${formatTime(endTime)} ||\t${activeAGO}`;
+        message += `Monitoring stopped : ${formatTime(endTime)}${lastActiveText}`;
     } else {
-        message += `END : ${formatTime(endTime)} ||\t${activeAGO} `;
+        message += `END : ${formatTime(endTime)}${lastActiveText}`;
     }
 
     addToLogs(message);
