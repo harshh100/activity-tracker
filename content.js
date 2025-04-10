@@ -14,6 +14,8 @@ let statusPeriod = {
 
 let previousPeriod = null;
 
+let activeAGO = null;
+
 // Initialize connection
 if (window.location.hostname.includes('instagram.com')) {
     setupMessageListener();
@@ -94,8 +96,9 @@ function startMonitoring(username) {
     // Initial check
     checkActiveStatus();
 
-    addToLogs(`Started monitoring\n`);
     console.log(`Started monitoring ${monitoringState.targetUsername}`);
+    const now = new Date();
+    addToLogs(`Started monitoring : ${now}\n`);
     updatePopupStatus();
 }
 
@@ -141,6 +144,7 @@ function checkActiveStatus() {
     const activeStatusElement = Array.from(foundUser.querySelectorAll('span[dir="auto"]'))
         .find(el => el.textContent.includes('Active'));
     const activeText = activeStatusElement?.textContent?.toLowerCase() || '';
+    activeAGO = activeText;
     const textActive = activeText.includes('active now');
 
     const profilePhotoContainer = foundUser.querySelector('[style*="height: 56px"][style*="width: 56px"]');
@@ -177,9 +181,9 @@ function logStatusPeriod(stopMonitoring = false) {
     let message = `${monitoringState.targetUsername}: ${status}\t||\t[ ${formatDuration(duration)} ]\t|| START : ${formatTime(statusPeriod.startTime)} || `;
 
     if (stopMonitoring) {
-        message += `Monitoring stopped : ${formatTime(endTime)}`;
+        message += `Monitoring stopped : ${formatTime(endTime)} ||\t${activeAGO}`;
     } else {
-        message += `END : ${formatTime(endTime)}`;
+        message += `END : ${formatTime(endTime)} ||\t${activeAGO} `;
     }
 
     addToLogs(message);
